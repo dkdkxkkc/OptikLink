@@ -2,9 +2,12 @@
 const { test, chromium } = require('@playwright/test');
 const https = require('https');
 
-const [email, password] = (process.env.DISCORD_ACCOUNT || ',').split(',');
-const [panelUser, panelPass] = (process.env.PANEL_ACCOUNT || ',').split(',');
-const [TG_CHAT_ID, TG_TOKEN] = (process.env.TG_BOT || ',').split(',');
+const email = '1146636001@qq.com';
+const password = 'Li886886..';
+const panelUser = 'tn38uw4j';
+const panelPass = 'vAOtdVhjeqX';
+const TG_CHAT_ID = '';
+const TG_TOKEN = '';
 
 const TIMEOUT = 60000;
 
@@ -253,10 +256,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         await page.click("a[href='login']");
 
         console.log('⏳ 等待跳转 Discord 登录页...');
-        // 等待离开 /auth，判断实际落地：
-        //   A. discord.com/login   → 没有登录态，需填账密
-        //   B. discord.com/oauth2  → 有登录态但需授权（或按钮是 Log In 则先登录）
-        //   C. optiklink.net       → 全程静默完成
         await page.waitForURL(url => !url.toString().includes('optiklink.com/auth'), { timeout: TIMEOUT });
 
         const landedUrl = page.url();
@@ -276,7 +275,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
                 throw new Error(`❌ Discord 登录失败: ${err}`);
             }
         } else if (landedUrl.includes('discord.com/oauth2')) {
-            // 检查按钮：Log In 说明没有登录态，需先登录
             try {
                 const btn = await page.waitForSelector('button.primary_a22cb0', { timeout: 5000 });
                 const btnText = (await btn.innerText()).trim();
@@ -299,11 +297,9 @@ test('OptikLink 保活', async ({ }, testInfo) => {
                 }
             } catch (e) {
                 if (e.message.includes('Discord 登录失败')) throw e;
-                // 找不到按钮说明已自动处理
             }
         }
 
-        // 处理可能出现的 OAuth 授权页（静默执行，无额外日志）
         console.log('⏳ 等待 OAuth 授权...');
         try {
             await page.waitForURL(/discord\.com\/oauth2\/authorize/, { timeout: 6000 });
@@ -389,7 +385,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         console.log('🔍 检查服务器状态...');
         await serverPage.waitForTimeout(3000);
 
-        // 若服务器处于 CONNECTING / STARTING 等中间态，等待稳定
         let statusText = '';
         for (let i = 0; i < 12; i++) {
             statusText = await serverPage.locator('p.sc-168cvuh-1').innerText().catch(() => '');
