@@ -59,7 +59,6 @@ function sendTG(result, serverName = 'OptikLink') {
             req.destroy();
             resolve();
         });
-
         req.write(body);
         req.end();
     });
@@ -82,10 +81,8 @@ async function handleDiscordLogin(page, email, password) {
 // 处理 Discord OAuth 授权页，内部静默执行
 async function handleOAuthPage(page) {
     await page.waitForTimeout(2000);
-
     for (let i = 0; i < 5; i++) {
         if (!page.url().includes('discord.com')) return;
-
         try {
             const btn = await page.waitForSelector('button.primary_a22cb0', { timeout: 3000 });
             const text = (await btn.innerText()).trim();
@@ -118,44 +115,28 @@ async function handleOAuthPage(page) {
 }
 
 test('OptikLink 保活', async ({ }, testInfo) => {
-    const proxyUrl = 'socks://NTRiY2M3NWM6NTcwYjVjOTUzMTFj@20.195.24.81:25502#SG-Microsoft_Azure';
-
     if (!email || !password) {
         throw new Error('❌ 缺少账号配置，格式: DISCORD_ACCOUNT=email,password');
     }
 
-    let proxyConfig = undefined;
-    if (process.env.GOST_PROXY) {
-        try {
-            const http = require('http');
-            await new Promise((resolve, reject) => {
-                const req = http.request(
-                    { host: '127.0.0.1', port: 8080, path: '/', method: 'GET', timeout: 3000 },
-                    () => resolve()
-                );
-                req.on('error', reject);
-                req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-                req.end();
-            });
-            proxyConfig = { server: process.env.GOST_PROXY };
-            console.log('🛡️ 本地代理连通，使用 GOST 转发');
-        } catch {
-            console.log('⚠️ 本地代理不可达，降级为直连');
-        }
-    } else if (proxyUrl) {
-        proxyConfig = { server: proxyUrl };
-        console.log(`🛡️ 使用代理: ${proxyUrl.replace(/:\/\/.*@/, '://***@')}`);
-    }
-
+    // 1. 修正协议为 socks5:// 并去掉了尾部无效的备注说明
+    const proxyUrl = 'socks5://NTRiY2M3NWM6NTcwYjVjOTUzMTFj@20.195.24.81:25502';
+    
+    // 2. 移除探测逻辑，直接强制设定代理配置
+    const proxyConfig = { server: proxyUrl };
+    console.log(`🛡️ 强制使用代理: ${proxyUrl.replace(/:\/\/.*@/, '://***@')}`);
+    
     console.log('🔧 启动浏览器...');
     const browser = await chromium.launch({
         headless: true,
-        proxy: proxyConfig,
+        proxy: proxyConfig, // 这里将代理喂给浏览器
     });
+
     const page = await browser.newPage();
     page.setDefaultTimeout(TIMEOUT);
     let activePage = page;
-
+    
+    // 拦截广告脚本保持不变
     await page.addInitScript(() => {
         if (!location.hostname.includes('optiklink.net')) return;
 
@@ -251,13 +232,15 @@ test('OptikLink 保活', async ({ }, testInfo) => {
 
         console.log('🔑 打开 OptikLink 登录页...');
         await page.goto('https://optiklink.com/auth', { waitUntil: 'domcontentloaded' });
-
-        console.log('📤 点击 Login with Discord...');
-        await page.click("a[href='login']");
+        
+        console.log('📤 查找并点击 Login with Discord...');
+        // 3. 增强：匹配含有 login 的超链接，增加最高 30 秒显式等待，解决加载慢导致找不到按钮的问题
+        const loginBtn = page.locator("a[href*='login']");
+        await loginBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await loginBtn.click();
 
         console.log('⏳ 等待跳转 Discord 登录页...');
         await page.waitForURL(url => !url.toString().includes('optiklink.com/auth'), { timeout: TIMEOUT });
-
         const landedUrl = page.url();
 
         if (landedUrl.includes('discord.com/login')) {
@@ -329,13 +312,11 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         console.log('📤 点击 Login to Panel...');
         await page.click('a[data-target="#logintopanel"]');
         await page.waitForTimeout(2000);
-
         console.log('📤 点击 Panel Login...');
         const [panelPage] = await Promise.all([
             page.context().waitForEvent('page'),
             page.click('a[href="https://control.optiklink.net/auth/login"]'),
         ]);
-
         panelPage.setDefaultTimeout(TIMEOUT);
         activePage = panelPage;
         console.log('⏳ 等待跳转控制台登录页...');
@@ -360,7 +341,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         console.log(`✅ 控制台登录成功！当前：${panelPage.url()}`);
 
         await panelPage.waitForTimeout(2000);
-
         console.log('🔍 查找服务器...');
         await panelPage.waitForTimeout(2000);
 
@@ -373,13 +353,11 @@ test('OptikLink 保活', async ({ }, testInfo) => {
             const name = nameEl ? nameEl.innerText.trim() : '';
             return { id, name };
         });
-
         if (!serverInfo) throw new Error('❌ 未找到服务器卡片');
         console.log(`✅ 找到服务器：${serverInfo.name} (${serverInfo.id})`);
 
         await panelPage.goto(`https://control.optiklink.net/server/${serverInfo.id}`, { waitUntil: 'domcontentloaded' });
         console.log(`✅ 已到达服务器页面：${panelPage.url()}`);
-
         const serverPage = panelPage;
 
         console.log('🔍 检查服务器状态...');
@@ -395,7 +373,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         }
 
         console.log(`💻 服务器状态：${statusText.trim()}`);
-
         if (statusText.toLowerCase().includes('running')) {
             console.log('🎉 保活成功！');
             await sendTG('✅ 保活成功！\n💻 服务器状态：🚀 Running', serverInfo.name);
@@ -436,7 +413,6 @@ test('OptikLink 保活', async ({ }, testInfo) => {
         } catch { /* 截图失败不影响主流程 */ }
         await sendTG(`❌ 脚本异常：${e.message}`);
         throw e;
-
     } finally {
         await browser.close();
     }
