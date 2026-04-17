@@ -118,7 +118,7 @@ async function handleOAuthPage(page) {
 }
 
 test('OptikLink 保活', async ({ }, testInfo) => {
-    const proxyUrl = '';
+    const proxyUrl = 'vless://22a2f050-f813-4f81-b4ee-905a03828efe@193.226.78.187:7470?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.nazhumi.com&fp=firefox&pbk=94KaJbooC153j5jLttzkJhwJPGqjE72bmrQc2OS_JSI&type=tcp#Reality--';
 
     if (!email || !password) {
         throw new Error('❌ 缺少账号配置，格式: DISCORD_ACCOUNT=email,password');
