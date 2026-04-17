@@ -120,7 +120,8 @@ test('OptikLink 保活', async ({ }, testInfo) => {
     }
 
     // 1. 修正协议为 socks5:// 并去掉了尾部无效的备注说明
-    const proxyUrl = 'socks5://NTRiY2M3NWM6NTcwYjVjOTUzMTFj@20.195.24.81:25502';
+    const proxyUrl = 'socks5://pr.talordata.net:2600:jhfvjigcc136-flux-any:vjigccbufxvjy13
+';
     
     // 2. 移除探测逻辑，直接强制设定代理配置
     const proxyConfig = { server: proxyUrl };
